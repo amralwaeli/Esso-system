@@ -66,3 +66,11 @@ export async function getMyPurchaseRequests(createdBy: string, pageSize: number 
     updatedAt: doc.data().updatedAt?.toDate().toISOString() || new Date().toISOString(),
   })) as PurchaseRequest[];
 }
+export async function updateRequestToPurchased(id: string, cost: number): Promise<void> {
+  const docRef = doc(db, COLLECTION, id);
+  await updateDoc(docRef, {
+    status: 'purchased',
+    totalCost: cost,
+    updatedAt: Timestamp.now(),
+  });
+}

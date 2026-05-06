@@ -120,10 +120,10 @@ export interface PurchaseRequest {
   id: string;
   ingredientId: string;
   quantity: number;
-  unit: 'kg' | 'pcs' | 'litre';
+  unit: string;
   status: 'pending' | 'approved' | 'rejected' | 'purchased';
   createdBy: string;
-  totalCost?: number; // ← Required for P&L expense tracking
+  totalCost?: number; // ← NEW: Logistics adds the price here
   createdAt: string;
   updatedAt: string;
 }

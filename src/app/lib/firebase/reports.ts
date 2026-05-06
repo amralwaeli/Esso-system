@@ -61,3 +61,33 @@ export async function getPandL(startDate: string, endDate: string) {
 
   return { revenue, expenses, profit: revenue - expenses, orderCount: salesSnap.size, purchaseCount: purchasesSnap.size };
 }
+
+export async function getFinancialReport(days: number = 30) {
+  const endDate = new Date();
+  const startDate = new Date();
+  startDate.setDate(startDate.getDate() - days);
+
+  // 1. Fetch Sales
+  const salesQ = query(collection(db, 'daily_sales'), where('date', '>=', startDate.toISOString().split('T')[0]));
+  const salesSnap = await getDocs(salesQ);
+  let totalRevenue = 0;
+  salesSnap.forEach(d => totalRevenue += (d.data().sales || 0));
+
+  // 2. Fetch Expenses (Purchased Requests)
+  const expensesQ = query(
+    collection(db, 'purchase_requests'),
+    where('status', '==', 'purchased'),
+    where('createdAt', '>=', Timestamp.fromDate(startDate))
+  );
+  const expensesSnap = await getDocs(expensesQ);
+  let totalExpenses = 0;
+  expensesSnap.forEach(d => totalExpenses += (d.data().totalCost || 0));
+
+  return {
+    totalRevenue,
+    totalExpenses,
+    netProfit: totalRevenue - totalExpenses,
+    startDate,
+    endDate
+  };
+}
