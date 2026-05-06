@@ -8,7 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '../ui/label';
 import { Check, DollarSign, AlertCircle } from 'lucide-react';
 import { toast } from 'sonner';
-import { collection, query, where, orderBy, getDocs } from 'firebase/firestore';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase/config';
 import { updateRequestToPurchased } from '../../lib/firebase/purchases';
 import type { PurchaseRequest } from '../../types';
@@ -17,34 +17,61 @@ export function LogisticsPanel() {
   const [requests, setRequests] = useState<PurchaseRequest[]>([]);
   const [purchased, setPurchased] = useState<PurchaseRequest[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [costInput, setCostInput] = useState<string>('');
   const [selectedReqId, setSelectedReqId] = useState<string | null>(null);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    // Load Pending Requests
-    const reqQ = query(collection(db, 'purchase_requests'), where('status', 'in', ['pending', 'approved']), orderBy('createdAt', 'desc'));
-    const reqSnap = await getDocs(reqQ);
-    setRequests(reqSnap.docs.map(d => ({ id: d.id, ...d.data() } as PurchaseRequest)));
+    setLoading(true);
+    setError(null);
 
-    // Load Purchased Bills
-    const purQ = query(collection(db, 'purchase_requests'), where('status', '==', 'purchased'), orderBy('createdAt', 'desc'));
-    const purSnap = await getDocs(purQ);
-    setPurchased(purSnap.docs.map(d => ({ id: d.id, ...d.data() } as PurchaseRequest)));
-    setLoading(false);
+    try {
+      const [reqSnap, purSnap] = await Promise.all([
+        getDocs(query(collection(db, 'purchase_requests'), where('status', 'in', ['pending', 'approved']))),
+        getDocs(query(collection(db, 'purchase_requests'), where('status', '==', 'purchased'))),
+      ]);
+
+      const toRequest = (d: any) => {
+        const raw = d.data();
+        return {
+          id: d.id,
+          ...raw,
+          createdAt: raw.createdAt?.toDate?.().toISOString() || raw.createdAt || new Date().toISOString(),
+          updatedAt: raw.updatedAt?.toDate?.().toISOString() || raw.updatedAt || new Date().toISOString(),
+        } as PurchaseRequest;
+      };
+
+      const sortNewest = (a: PurchaseRequest, b: PurchaseRequest) =>
+        new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+
+      setRequests(reqSnap.docs.map(toRequest).sort(sortNewest));
+      setPurchased(purSnap.docs.map(toRequest).sort(sortNewest));
+    } catch (err) {
+      console.error('Failed to load logistics data', err);
+      setError('Could not load logistics data. Check Firebase rules and configuration.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleAddBill = async () => {
     if (!selectedReqId || !costInput) return;
-    await updateRequestToPurchased(selectedReqId, parseFloat(costInput));
-    toast.success('Bill added and request marked as purchased');
-    setCostInput('');
-    setSelectedReqId(null);
-    loadData();
+    try {
+      await updateRequestToPurchased(selectedReqId, parseFloat(costInput));
+      toast.success('Bill added and request marked as purchased');
+      setCostInput('');
+      setSelectedReqId(null);
+      loadData();
+    } catch (err) {
+      console.error('Failed to add bill', err);
+      toast.error('Could not add bill');
+    }
   };
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
+  if (error) return <div className="p-8 text-center text-red-600">{error}</div>;
 
   return (
     <Tabs defaultValue="inventory">

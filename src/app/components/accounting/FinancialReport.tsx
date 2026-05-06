@@ -7,17 +7,25 @@ import { getFinancialReport } from '../../lib/firebase/reports';
 export function FinancialReport() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchReport = async () => {
-      const report = await getFinancialReport(30); // Last 30 days
-      setData(report);
-      setLoading(false);
+      try {
+        const report = await getFinancialReport(30); // Last 30 days
+        setData(report);
+      } catch (err) {
+        console.error('Failed to load financial report', err);
+        setError('Could not load financial report. Check Firebase rules and configuration.');
+      } finally {
+        setLoading(false);
+      }
     };
     fetchReport();
   }, []);
 
   if (loading) return <div className="p-8 text-center">Loading Financial Report...</div>;
+  if (error) return <div className="p-8 text-center text-red-600">{error}</div>;
 
   const chartData = [
     { name: 'Revenue', amount: data?.totalRevenue || 0, fill: '#10b981' },

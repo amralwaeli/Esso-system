@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { HashRouter , Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { initializeFirebase } from './lib/firebase/init';
 import { PinLock } from './pages/PinLock';
@@ -17,19 +17,18 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <HashRouter >
+      <HashRouter>
         <Routes>
           <Route path="/" element={<PinLock />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/cashier" element={<Cashier />} />
           <Route path="/accounting" element={<Accounting />} />
-          <Route path="/inventory" element={<div>Inventory Page Coming Soon</div>} />
+          <Route path="/inventory" element={<Inventory />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="*" element={<Navigate to="/" replace />} />
-          <Route path="/inventory" element={<Inventory />} />
         </Routes>
         <Toaster position="top-center" />
-      </HashRouter >
+      </HashRouter>
     </AuthProvider>
   );
 }

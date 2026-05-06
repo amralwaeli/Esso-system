@@ -1,4 +1,4 @@
-import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
+import { collection, doc, query, where, getDoc, getDocs, orderBy } from 'firebase/firestore';
 import { db } from './config';
 import type { DailySales } from '../../types';
 
@@ -49,15 +49,15 @@ export async function getPandL(startDate: string, endDate: string) {
   salesSnap.forEach(d => { revenue += (d.data().sales || 0); });
 
   // Expenses (Purchased ingredient requests)
-  const purchasesQ = query(
-    collection(db, 'purchase_requests'),
-    where('status', '==', 'purchased'),
-    where('createdAt', '>=', Timestamp.fromDate(new Date(startDate))),
-    where('createdAt', '<=', Timestamp.fromDate(new Date(endDate)))
-  );
+  const purchasesQ = query(collection(db, 'purchase_requests'), where('status', '==', 'purchased'));
   const purchasesSnap = await getDocs(purchasesQ);
   let expenses = 0;
-  purchasesSnap.forEach(d => { expenses += (d.data().totalCost || 0); });
+  purchasesSnap.forEach(d => {
+    const createdAt = toDate(d.data().createdAt);
+    if (createdAt >= new Date(startDate) && createdAt <= new Date(endDate)) {
+      expenses += (d.data().totalCost || 0);
+    }
+  });
 
   return { revenue, expenses, profit: revenue - expenses, orderCount: salesSnap.size, purchaseCount: purchasesSnap.size };
 }
@@ -74,14 +74,14 @@ export async function getFinancialReport(days: number = 30) {
   salesSnap.forEach(d => totalRevenue += (d.data().sales || 0));
 
   // 2. Fetch Expenses (Purchased Requests)
-  const expensesQ = query(
-    collection(db, 'purchase_requests'),
-    where('status', '==', 'purchased'),
-    where('createdAt', '>=', Timestamp.fromDate(startDate))
-  );
+  const expensesQ = query(collection(db, 'purchase_requests'), where('status', '==', 'purchased'));
   const expensesSnap = await getDocs(expensesQ);
   let totalExpenses = 0;
-  expensesSnap.forEach(d => totalExpenses += (d.data().totalCost || 0));
+  expensesSnap.forEach(d => {
+    if (toDate(d.data().createdAt) >= startDate) {
+      totalExpenses += (d.data().totalCost || 0);
+    }
+  });
 
   return {
     totalRevenue,
@@ -90,4 +90,10 @@ export async function getFinancialReport(days: number = 30) {
     startDate,
     endDate
   };
+}
+
+function toDate(value: any): Date {
+  if (value?.toDate) return value.toDate();
+  if (typeof value === 'string' || typeof value === 'number') return new Date(value);
+  return new Date(0);
 }

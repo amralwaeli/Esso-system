@@ -18,6 +18,8 @@ export function Inventory() {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [alerts, setAlerts] = useState<any[]>([]);
   const [pending, setPending] = useState<PurchaseRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'kitchen' | 'logistics'>(
     staff?.role === 'logistics' ? 'logistics' : 'kitchen'
   );
@@ -28,31 +30,70 @@ export function Inventory() {
     else loadLogistics();
   }, [staff, navigate]);
 
-  const loadKitchen = async () => setIngredients(await getIngredients());
+  const loadKitchen = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      setIngredients(await getIngredients());
+    } catch (err) {
+      console.error('Failed to load inventory data', err);
+      setError('Could not load inventory data. Check Firebase rules and configuration.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const loadLogistics = async () => {
-    const { requests } = await getPendingPurchaseRequests(20);
-    setPending(requests);
-    setAlerts(await getLowStockAlerts());
+    setLoading(true);
+    setError(null);
+    try {
+      const [{ requests }, lowStockAlerts] = await Promise.all([
+        getPendingPurchaseRequests(20),
+        getLowStockAlerts(),
+      ]);
+      setPending(requests);
+      setAlerts(lowStockAlerts);
+    } catch (err) {
+      console.error('Failed to load logistics inventory data', err);
+      setError('Could not load inventory data. Check Firebase rules and configuration.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleStockUpdate = async (id: string, newStock: number) => {
     const ing = ingredients.find(i => i.id === id);
     if (!ing) return;
-    await updateIngredientStock(id, newStock, ing.minStock);
-    toast.success('Stock updated');
-    loadKitchen();
+    try {
+      await updateIngredientStock(id, newStock, ing.minStock);
+      toast.success('Stock updated');
+      loadKitchen();
+    } catch (err) {
+      console.error('Failed to update stock', err);
+      toast.error('Could not update stock');
+    }
   };
 
   const createRequest = async (ingredientId: string, qty: number, unit: string) => {
     if (!staff) return;
-    await createPurchaseRequest({ ingredientId, quantity: qty, unit, status: 'pending', createdBy: staff.name });
-    toast.success('Request sent to Logistics');
+    try {
+      await createPurchaseRequest({ ingredientId, quantity: qty, unit, status: 'pending', createdBy: staff.name });
+      toast.success('Request sent to Logistics');
+    } catch (err) {
+      console.error('Failed to create purchase request', err);
+      toast.error('Could not create request');
+    }
   };
 
   const updateStatus = async (id: string, status: 'approved' | 'rejected' | 'purchased') => {
-    await updatePurchaseRequestStatus(id, status);
-    toast.success(`Status: ${status}`);
-    loadLogistics();
+    try {
+      await updatePurchaseRequestStatus(id, status);
+      toast.success(`Status: ${status}`);
+      loadLogistics();
+    } catch (err) {
+      console.error('Failed to update request status', err);
+      toast.error('Could not update request');
+    }
   };
 
   if (!staff) return null;
@@ -71,6 +112,9 @@ export function Inventory() {
       </header>
 
       <main className="container mx-auto px-4 py-6">
+        {loading && <div className="p-8 text-center">Loading inventory...</div>}
+        {error && <div className="p-8 text-center text-red-600">{error}</div>}
+        {!loading && !error && (
         <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)}>
           <TabsList className="mb-6">
             <TabsTrigger value="kitchen" disabled={staff.role === 'logistics'}>Kitchen</TabsTrigger>
@@ -142,6 +186,7 @@ export function Inventory() {
             </div>
           </TabsContent>
         </Tabs>
+        )}
       </main>
     </div>
   );
