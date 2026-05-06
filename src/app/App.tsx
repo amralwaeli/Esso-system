@@ -8,6 +8,7 @@ import { Cashier } from './pages/Cashier';
 import { Accounting } from './pages/Accounting';
 import { Reports } from './pages/Reports';
 import { Toaster } from './components/ui/sonner';
+import { Inventory } from './pages/Inventory';
 
 export default function App() {
   useEffect(() => {
@@ -25,6 +26,7 @@ export default function App() {
           <Route path="/inventory" element={<div>Inventory Page Coming Soon</div>} />
           <Route path="/reports" element={<Reports />} />
           <Route path="*" element={<Navigate to="/" replace />} />
+          <Route path="/inventory" element={<Inventory />} />
         </Routes>
         <Toaster position="top-center" />
       </HashRouter >

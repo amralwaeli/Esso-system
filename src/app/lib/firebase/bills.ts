@@ -1,8 +1,6 @@
 import { collection, doc, getDocs, setDoc, query, orderBy, limit, startAfter, where, writeBatch, Timestamp, increment, getDoc } from 'firebase/firestore';
 import { db } from './config';
 import type { Bill, BillSummary, BillDetails, OrderItem, Settings } from '../../types';
-import { updateProductStock } from './products';
-import { addInventoryMovement } from './inventory';
 
 export async function getBillsSummary(pageSize: number = 20, lastDoc?: any): Promise<{ bills: BillSummary[], lastDoc: any }> {
   let q = query(
@@ -90,11 +88,12 @@ export async function createBill(
   batch.set(dailySalesRef, salesIncrement, { merge: true });
 
   for (const item of bill.items) {
-    const productRef = doc(db, 'products', item.productId);
-    batch.update(productRef, {
-      stock: increment(-item.quantity),
-      updatedAt: Timestamp.now(),
-    });
+  const productRef = doc(db, 'products', item.productId);
+      batch.update(productRef, {
+        salesCount: increment(item.quantity),
+        updatedAt: Timestamp.now(),
+      });
+    }
 
     const movementRef = doc(collection(db, 'inventory_movements'));
     batch.set(movementRef, {

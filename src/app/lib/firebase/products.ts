@@ -41,20 +41,13 @@ export async function updateProduct(id: string, updates: Partial<Product>): Prom
   cache.invalidate('products');
 }
 
-export async function updateProductStock(id: string, quantityChange: number): Promise<void> {
-  const docRef = doc(db, COLLECTION, id);
+export async function incrementProductSales(productId: string, quantity: number = 1): Promise<void> {
+  const docRef = doc(db, COLLECTION, productId);
   await updateDoc(docRef, {
-    stock: increment(quantityChange),
+    salesCount: increment(quantity),
     updatedAt: Timestamp.now(),
   });
-
-  const cached = cache.get<Product[]>('products');
-  if (cached) {
-    const updated = cached.map(p =>
-      p.id === id ? { ...p, stock: p.stock + quantityChange } : p
-    );
-    cache.set('products', updated, CACHE_TTL.PRODUCTS);
-  }
+  cache.invalidate('products');
 }
 
 export async function deleteProduct(id: string): Promise<void> {

@@ -21,8 +21,7 @@ export interface Product {
   name: string;
   price: number;
   categoryId: string;
-  stock: number;
-  lowStockThreshold: number;
+  salesCount: number; // ← Replaces stock
   image?: string;
   isActive: boolean;
   createdAt: string;
@@ -121,9 +120,10 @@ export interface PurchaseRequest {
   id: string;
   ingredientId: string;
   quantity: number;
-  unit: string;
+  unit: 'kg' | 'pcs' | 'litre';
   status: 'pending' | 'approved' | 'rejected' | 'purchased';
   createdBy: string;
+  totalCost?: number; // ← Required for P&L expense tracking
   createdAt: string;
   updatedAt: string;
 }

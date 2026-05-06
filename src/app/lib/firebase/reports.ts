@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, getDoc, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, where, getDocs, orderBy, Timestamp } from 'firebase/firestore';
 import { db } from './config';
 import type { DailySales } from '../../types';
 
@@ -40,4 +40,24 @@ export async function getTodaySales(): Promise<DailySales | null> {
     ...docSnap.data(),
     updatedAt: docSnap.data().updatedAt?.toDate().toISOString() || new Date().toISOString(),
   } as DailySales;
+}
+export async function getPandL(startDate: string, endDate: string) {
+  // Revenue
+  const salesQ = query(collection(db, 'daily_sales'), where('date', '>=', startDate), where('date', '<=', endDate));
+  const salesSnap = await getDocs(salesQ);
+  let revenue = 0;
+  salesSnap.forEach(d => { revenue += (d.data().sales || 0); });
+
+  // Expenses (Purchased ingredient requests)
+  const purchasesQ = query(
+    collection(db, 'purchase_requests'),
+    where('status', '==', 'purchased'),
+    where('createdAt', '>=', Timestamp.fromDate(new Date(startDate))),
+    where('createdAt', '<=', Timestamp.fromDate(new Date(endDate)))
+  );
+  const purchasesSnap = await getDocs(purchasesQ);
+  let expenses = 0;
+  purchasesSnap.forEach(d => { expenses += (d.data().totalCost || 0); });
+
+  return { revenue, expenses, profit: revenue - expenses, orderCount: salesSnap.size, purchaseCount: purchasesSnap.size };
 }
