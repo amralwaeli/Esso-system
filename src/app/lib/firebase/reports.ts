@@ -62,13 +62,26 @@ export async function getPandL(startDate: string, endDate: string) {
   return { revenue, expenses, profit: revenue - expenses, orderCount: salesSnap.size, purchaseCount: purchasesSnap.size };
 }
 
-export async function getFinancialReport(days: number = 30) {
+export async function getFinancialReport(days: number = 30, mode: 'daily' | 'monthly' = 'monthly') {
   const endDate = new Date();
   const startDate = new Date();
-  startDate.setDate(startDate.getDate() - days);
+  if (mode === 'daily') {
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+  } else {
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+  }
+
+  const startDateKey = startDate.toISOString().split('T')[0];
+  const endDateKey = endDate.toISOString().split('T')[0];
 
   // 1. Fetch Sales
-  const salesQ = query(collection(db, 'daily_sales'), where('date', '>=', startDate.toISOString().split('T')[0]));
+  const salesQ = query(
+    collection(db, 'daily_sales'),
+    where('date', '>=', startDateKey),
+    where('date', '<=', endDateKey)
+  );
   const salesSnap = await getDocs(salesQ);
   let totalRevenue = 0;
   salesSnap.forEach(d => totalRevenue += (d.data().sales || 0));
@@ -100,6 +113,7 @@ export async function getFinancialReport(days: number = 30) {
     recentExpenses: recentExpenses
       .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
       .slice(0, 10),
+    mode,
     startDate,
     endDate
   };

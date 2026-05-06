@@ -42,6 +42,18 @@ export function BillsTab() {
   if (error) return <p className="text-center py-8 text-red-600">{error}</p>;
 
   const totalSpent = purchases.reduce((sum, p) => sum + (p.totalCost || 0), 0);
+  const getBillItemsLabel = (bill: PurchaseRequest) => {
+    if (bill.items?.length) {
+      return bill.items.map(item => `${item.name} (${item.quantity} ${item.unit})`).join(', ');
+    }
+
+    return bill.ingredientId;
+  };
+
+  const getBillQtyLabel = (bill: PurchaseRequest) => {
+    if (bill.items?.length) return `${bill.items.length} item${bill.items.length === 1 ? '' : 's'}`;
+    return `${bill.quantity} ${bill.unit}`;
+  };
 
   return (
     <Card>
@@ -57,9 +69,8 @@ export function BillsTab() {
           <TableHeader>
             <TableRow>
               <TableHead>Date</TableHead>
-              <TableHead>Ingredient</TableHead>
+              <TableHead>Items</TableHead>
               <TableHead>Qty</TableHead>
-              <TableHead>Unit</TableHead>
               <TableHead>Supplier</TableHead>
               <TableHead>Invoice</TableHead>
               <TableHead>Cost</TableHead>
@@ -70,9 +81,8 @@ export function BillsTab() {
             {purchases.map(req => (
               <TableRow key={req.id}>
                 <TableCell>{new Date(req.createdAt).toLocaleDateString()}</TableCell>
-                <TableCell className="font-medium">{req.ingredientId}</TableCell>
-                <TableCell>{req.quantity}</TableCell>
-                <TableCell>{req.unit}</TableCell>
+                <TableCell className="font-medium">{getBillItemsLabel(req)}</TableCell>
+                <TableCell>{getBillQtyLabel(req)}</TableCell>
                 <TableCell>{req.supplier || '-'}</TableCell>
                 <TableCell>{req.invoiceNumber || '-'}</TableCell>
                 <TableCell className="font-medium text-red-600">
@@ -83,7 +93,7 @@ export function BillsTab() {
             ))}
             {purchases.length === 0 && (
               <TableRow>
-                <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                <TableCell colSpan={7} className="text-center text-muted-foreground py-6">
                   No purchase records found
                 </TableCell>
               </TableRow>

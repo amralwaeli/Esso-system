@@ -121,6 +121,7 @@ export interface PurchaseRequest {
   ingredientId: string;
   quantity: number;
   unit: string;
+  items?: PurchaseBillItem[];
   status: 'pending' | 'approved' | 'rejected' | 'purchased';
   createdBy: string;
   supplier?: string;
@@ -130,6 +131,12 @@ export interface PurchaseRequest {
   totalCost?: number; // ← NEW: Logistics adds the price here
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PurchaseBillItem {
+  name: string;
+  quantity: number;
+  unit: string;
 }
 
 export interface LowStockAlert {

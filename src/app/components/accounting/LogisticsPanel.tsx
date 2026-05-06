@@ -7,7 +7,8 @@ import { Input } from '../ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '../ui/dialog';
 import { Label } from '../ui/label';
 import { Textarea } from '../ui/textarea';
-import { Check, DollarSign, AlertCircle, Plus } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Check, DollarSign, AlertCircle, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '../../lib/firebase/config';
@@ -17,13 +18,16 @@ import { useAuth } from '../../contexts/AuthContext';
 import type { PurchaseRequest } from '../../types';
 
 const emptyBillForm = {
-  ingredientId: '',
-  quantity: '',
-  unit: '',
   totalCost: '',
   supplier: '',
   invoiceNumber: '',
   notes: '',
+};
+
+const emptyBillItem = {
+  name: '',
+  quantity: '',
+  unit: 'kg',
 };
 
 export function LogisticsPanel() {
@@ -41,6 +45,7 @@ export function LogisticsPanel() {
   const [requestBillOpen, setRequestBillOpen] = useState(false);
   const [manualBillOpen, setManualBillOpen] = useState(false);
   const [manualBill, setManualBill] = useState(emptyBillForm);
+  const [manualBillItems, setManualBillItems] = useState([emptyBillItem]);
 
   useEffect(() => { loadData(); }, []);
 
@@ -100,26 +105,32 @@ export function LogisticsPanel() {
   };
 
   const handleCreateManualBill = async () => {
-    const quantity = parseFloat(manualBill.quantity);
     const totalCost = parseFloat(manualBill.totalCost);
+    const items = manualBillItems.map(item => ({
+      name: item.name.trim(),
+      quantity: parseFloat(item.quantity),
+      unit: item.unit,
+    }));
 
     if (
-      !manualBill.ingredientId.trim() ||
-      !manualBill.unit.trim() ||
-      !Number.isFinite(quantity) ||
       !Number.isFinite(totalCost) ||
-      quantity <= 0 ||
       totalCost <= 0
     ) {
-      toast.error('Enter ingredient, quantity, unit, and cost');
+      toast.error('Enter a valid bill total');
+      return;
+    }
+
+    if (items.some(item => !item.name || !Number.isFinite(item.quantity) || item.quantity <= 0 || !item.unit)) {
+      toast.error('Enter every item name, quantity, and unit');
       return;
     }
 
     try {
       await createPurchaseBill({
-        ingredientId: manualBill.ingredientId.trim(),
-        quantity,
-        unit: manualBill.unit.trim(),
+        ingredientId: items.length === 1 ? items[0].name : `${items.length} items`,
+        quantity: items.length,
+        unit: 'bill',
+        items,
         totalCost,
         supplier: manualBill.supplier.trim() || undefined,
         invoiceNumber: manualBill.invoiceNumber.trim() || undefined,
@@ -127,8 +138,7 @@ export function LogisticsPanel() {
         createdBy: staff?.name || 'Logistics',
       });
       toast.success('Purchase bill recorded');
-      setManualBill(emptyBillForm);
-      setManualBillOpen(false);
+      resetManualBillForm();
       loadData();
     } catch (err) {
       console.error('Failed to create manual purchase bill', err);
@@ -147,6 +157,39 @@ export function LogisticsPanel() {
 
   const updateManualBill = (field: keyof typeof emptyBillForm, value: string) => {
     setManualBill(current => ({ ...current, [field]: value }));
+  };
+
+  const updateManualBillItem = (index: number, field: keyof typeof emptyBillItem, value: string) => {
+    setManualBillItems(current => current.map((item, itemIndex) =>
+      itemIndex === index ? { ...item, [field]: value } : item
+    ));
+  };
+
+  const addManualBillItem = () => {
+    setManualBillItems(current => [...current, emptyBillItem]);
+  };
+
+  const removeManualBillItem = (index: number) => {
+    setManualBillItems(current => current.length === 1 ? current : current.filter((_, itemIndex) => itemIndex !== index));
+  };
+
+  const resetManualBillForm = () => {
+    setManualBill(emptyBillForm);
+    setManualBillItems([emptyBillItem]);
+    setManualBillOpen(false);
+  };
+
+  const getBillItemsLabel = (req: PurchaseRequest) => {
+    if (req.items?.length) {
+      return req.items.map(item => `${item.name} (${item.quantity} ${item.unit})`).join(', ');
+    }
+
+    return req.ingredientId;
+  };
+
+  const getBillQtyLabel = (req: PurchaseRequest) => {
+    if (req.items?.length) return `${req.items.length} item${req.items.length === 1 ? '' : 's'}`;
+    return `${req.quantity} ${req.unit}`;
   };
 
   if (loading) return <div className="p-8 text-center">Loading...</div>;
@@ -236,49 +279,81 @@ export function LogisticsPanel() {
             <CardTitle>Recorded Expenses</CardTitle>
             <Dialog open={manualBillOpen} onOpenChange={(open) => {
               setManualBillOpen(open);
-              if (!open) setManualBill(emptyBillForm);
+              if (!open) resetManualBillForm();
             }}>
               <DialogTrigger asChild>
                 <Button>
                   <Plus className="mr-2 h-4 w-4" /> Add Purchase Bill
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="max-w-3xl">
                 <DialogHeader>
                   <DialogTitle>Add Purchase Bill</DialogTitle>
                 </DialogHeader>
-                <div className="grid gap-4 py-4">
-                  <div className="grid gap-2">
-                    <Label>Ingredient / Item</Label>
-                    <Input value={manualBill.ingredientId} onChange={e => updateManualBill('ingredientId', e.target.value)} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-2">
-                      <Label>Quantity</Label>
-                      <Input type="number" min="0" step="0.01" value={manualBill.quantity} onChange={e => updateManualBill('quantity', e.target.value)} />
+                <div className="grid max-h-[70vh] gap-5 overflow-y-auto py-4 pr-2">
+                  <div className="grid gap-4 rounded-md border p-4">
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                      <div className="grid gap-2">
+                        <Label>Supplier</Label>
+                        <Input value={manualBill.supplier} onChange={e => updateManualBill('supplier', e.target.value)} />
+                      </div>
+                      <div className="grid gap-2">
+                        <Label>Invoice Number</Label>
+                        <Input value={manualBill.invoiceNumber} onChange={e => updateManualBill('invoiceNumber', e.target.value)} />
+                      </div>
                     </div>
                     <div className="grid gap-2">
-                      <Label>Unit</Label>
-                      <Input placeholder="kg, pcs, litre" value={manualBill.unit} onChange={e => updateManualBill('unit', e.target.value)} />
-                    </div>
-                  </div>
-                  <div className="grid gap-2">
-                    <Label>Total Cost</Label>
-                    <Input type="number" min="0" step="0.01" placeholder="0.00" value={manualBill.totalCost} onChange={e => updateManualBill('totalCost', e.target.value)} />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="grid gap-2">
-                      <Label>Supplier</Label>
-                      <Input value={manualBill.supplier} onChange={e => updateManualBill('supplier', e.target.value)} />
+                      <Label>Total Bill Cost</Label>
+                      <Input type="number" min="0" step="0.01" placeholder="0.00" value={manualBill.totalCost} onChange={e => updateManualBill('totalCost', e.target.value)} />
                     </div>
                     <div className="grid gap-2">
-                      <Label>Invoice Number</Label>
-                      <Input value={manualBill.invoiceNumber} onChange={e => updateManualBill('invoiceNumber', e.target.value)} />
+                      <Label>Notes</Label>
+                      <Textarea value={manualBill.notes} onChange={e => updateManualBill('notes', e.target.value)} />
                     </div>
                   </div>
-                  <div className="grid gap-2">
-                    <Label>Notes</Label>
-                    <Textarea value={manualBill.notes} onChange={e => updateManualBill('notes', e.target.value)} />
+
+                  <div className="grid gap-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <Label>Items</Label>
+                      <Button type="button" size="sm" variant="outline" onClick={addManualBillItem}>
+                        <Plus className="mr-1 h-4 w-4" /> Add Item
+                      </Button>
+                    </div>
+                    {manualBillItems.map((item, index) => (
+                      <div key={index} className="grid grid-cols-1 gap-3 rounded-md border p-3 md:grid-cols-[1fr_120px_130px_40px]">
+                        <div className="grid gap-2">
+                          <Label>Item</Label>
+                          <Input value={item.name} onChange={e => updateManualBillItem(index, 'name', e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Quantity</Label>
+                          <Input type="number" min="0" step="0.01" value={item.quantity} onChange={e => updateManualBillItem(index, 'quantity', e.target.value)} />
+                        </div>
+                        <div className="grid gap-2">
+                          <Label>Type</Label>
+                          <Select value={item.unit} onValueChange={(value) => updateManualBillItem(index, 'unit', value)}>
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="kg">kg</SelectItem>
+                              <SelectItem value="pcs">pcs</SelectItem>
+                              <SelectItem value="litre">litre</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          className="mt-7"
+                          onClick={() => removeManualBillItem(index)}
+                          disabled={manualBillItems.length === 1}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                   <Button onClick={handleCreateManualBill}>Record Bill</Button>
                 </div>
@@ -290,7 +365,7 @@ export function LogisticsPanel() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
-                  <TableHead>Ingredient</TableHead>
+                  <TableHead>Items</TableHead>
                   <TableHead>Qty</TableHead>
                   <TableHead>Supplier</TableHead>
                   <TableHead>Invoice</TableHead>
@@ -302,8 +377,8 @@ export function LogisticsPanel() {
                 {purchased.map(req => (
                   <TableRow key={req.id}>
                     <TableCell>{new Date(req.createdAt).toLocaleDateString()}</TableCell>
-                    <TableCell>{req.ingredientId}</TableCell>
-                    <TableCell>{req.quantity} {req.unit}</TableCell>
+                    <TableCell>{getBillItemsLabel(req)}</TableCell>
+                    <TableCell>{getBillQtyLabel(req)}</TableCell>
                     <TableCell>{req.supplier || '-'}</TableCell>
                     <TableCell>{req.invoiceNumber || '-'}</TableCell>
                     <TableCell className="font-bold text-red-600">{settings.currency} {(req.totalCost || 0).toFixed(2)}</TableCell>
