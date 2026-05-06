@@ -1,5 +1,5 @@
 import { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter , Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { initializeFirebase } from './lib/firebase/init';
 import { PinLock } from './pages/PinLock';
@@ -16,7 +16,7 @@ export default function App() {
 
   return (
     <AuthProvider>
-      <BrowserRouter>
+      <HashRouter >
         <Routes>
           <Route path="/" element={<PinLock />} />
           <Route path="/admin" element={<Admin />} />
@@ -27,7 +27,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <Toaster position="top-center" />
-      </BrowserRouter>
+      </HashRouter >
     </AuthProvider>
   );
 }

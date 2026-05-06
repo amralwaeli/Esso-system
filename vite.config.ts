@@ -18,7 +18,7 @@ function figmaAssetResolver() {
 
 export default defineConfig({
   // Replace 'your-repo-name' with your actual GitHub repository name
-  base: '/your-repo-name/',
+  base: '/Esso-system/',
 
   plugins: [
     figmaAssetResolver(),

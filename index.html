@@ -2,6 +2,15 @@
   <!DOCTYPE html>
   <html lang="en">
     <head>
+      <script>
+        (function() {
+          var p = window.location.search.match(/[?&]p=([^&]*)/);
+          if (p) {
+            var path = decodeURIComponent(p[1]);
+            window.history.replaceState(null, null, '/Esso-system' + path);
+          }
+        })();
+      </script>
       <meta charset="UTF-8" />
       <meta name="viewport" content="width=device-width, initial-scale=1.0" />
       <title>Complete POS System Overview</title>
