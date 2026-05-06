@@ -22,11 +22,23 @@ export async function getIngredients(): Promise<Ingredient[]> {
 }
 
 export async function addIngredient(ingredient: Omit<Ingredient, 'id'>): Promise<void> {
+  const batch = writeBatch(db);
   const docRef = doc(collection(db, COLLECTION));
-  await setDoc(docRef, {
+
+  batch.set(docRef, {
     ...ingredient,
     updatedAt: Timestamp.now(),
   });
+
+  if (ingredient.currentStock <= ingredient.minStock) {
+    batch.set(doc(db, 'low_stock_alerts', docRef.id), {
+      currentStock: ingredient.currentStock,
+      minStock: ingredient.minStock,
+      updatedAt: Timestamp.now(),
+    });
+  }
+
+  await batch.commit();
   cache.invalidate('ingredients');
 }
 

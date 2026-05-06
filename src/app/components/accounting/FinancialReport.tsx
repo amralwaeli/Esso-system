@@ -1,13 +1,16 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '../ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { TrendingUp, TrendingDown, DollarSign } from 'lucide-react';
+import { TrendingUp, TrendingDown, DollarSign, ReceiptText } from 'lucide-react';
 import { getFinancialReport } from '../../lib/firebase/reports';
+import { storage } from '../../lib/storage';
 
 export function FinancialReport() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const settings = storage.getSettings();
 
   useEffect(() => {
     const fetchReport = async () => {
@@ -36,7 +39,7 @@ export function FinancialReport() {
   return (
     <div className="space-y-6">
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
@@ -67,6 +70,16 @@ export function FinancialReport() {
             <p className="text-xs text-muted-foreground">Revenue - Expenses</p>
           </CardContent>
         </Card>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Purchase Bills</CardTitle>
+            <ReceiptText className="h-4 w-4 text-[#d4622e]" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{data?.purchaseCount || 0}</div>
+            <p className="text-xs text-muted-foreground">Recorded in last 30 days</p>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Chart */}
@@ -87,6 +100,43 @@ export function FinancialReport() {
               </BarChart>
             </ResponsiveContainer>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Purchase Bills</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Date</TableHead>
+                <TableHead>Ingredient</TableHead>
+                <TableHead>Supplier</TableHead>
+                <TableHead>Invoice</TableHead>
+                <TableHead>Total Cost</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {data?.recentExpenses?.map((bill: any) => (
+                <TableRow key={bill.id}>
+                  <TableCell>{new Date(bill.createdAt).toLocaleDateString()}</TableCell>
+                  <TableCell>{bill.ingredientId}</TableCell>
+                  <TableCell>{bill.supplier || '-'}</TableCell>
+                  <TableCell>{bill.invoiceNumber || '-'}</TableCell>
+                  <TableCell className="font-medium text-red-600">
+                    {settings.currency} {(bill.totalCost || 0).toFixed(2)}
+                  </TableCell>
+                </TableRow>
+              ))}
+              {(!data?.recentExpenses || data.recentExpenses.length === 0) && (
+                <TableRow>
+                  <TableCell colSpan={5} className="text-center text-muted-foreground">No purchase bills recorded in this period</TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
     </div>

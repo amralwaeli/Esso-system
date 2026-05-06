@@ -1,6 +1,6 @@
 import { collection, doc, query, where, getDoc, getDocs, orderBy } from 'firebase/firestore';
 import { db } from './config';
-import type { DailySales } from '../../types';
+import type { DailySales, PurchaseRequest } from '../../types';
 
 export async function getDailySales(startDate: string, endDate: string): Promise<DailySales[]> {
   const q = query(
@@ -77,9 +77,18 @@ export async function getFinancialReport(days: number = 30) {
   const expensesQ = query(collection(db, 'purchase_requests'), where('status', '==', 'purchased'));
   const expensesSnap = await getDocs(expensesQ);
   let totalExpenses = 0;
+  const recentExpenses: PurchaseRequest[] = [];
   expensesSnap.forEach(d => {
-    if (toDate(d.data().createdAt) >= startDate) {
-      totalExpenses += (d.data().totalCost || 0);
+    const raw = d.data();
+    const createdAt = toDate(raw.createdAt);
+    if (createdAt >= startDate) {
+      totalExpenses += (raw.totalCost || 0);
+      recentExpenses.push({
+        id: d.id,
+        ...raw,
+        createdAt: createdAt.toISOString(),
+        updatedAt: toDate(raw.updatedAt).toISOString(),
+      } as PurchaseRequest);
     }
   });
 
@@ -87,6 +96,10 @@ export async function getFinancialReport(days: number = 30) {
     totalRevenue,
     totalExpenses,
     netProfit: totalRevenue - totalExpenses,
+    purchaseCount: recentExpenses.length,
+    recentExpenses: recentExpenses
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      .slice(0, 10),
     startDate,
     endDate
   };

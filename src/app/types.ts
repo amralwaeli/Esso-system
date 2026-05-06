@@ -123,6 +123,10 @@ export interface PurchaseRequest {
   unit: string;
   status: 'pending' | 'approved' | 'rejected' | 'purchased';
   createdBy: string;
+  supplier?: string;
+  invoiceNumber?: string;
+  notes?: string;
+  source?: 'inventory_request' | 'manual_bill';
   totalCost?: number; // ← NEW: Logistics adds the price here
   createdAt: string;
   updatedAt: string;

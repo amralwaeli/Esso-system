@@ -9,14 +9,29 @@ import { AlertTriangle } from 'lucide-react';
 export function InventoryTab({ staff }: { staff: Staff }) {
   const [ingredients, setIngredients] = useState<Ingredient[]>([]);
   const [alerts, setAlerts] = useState<LowStockAlert[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
-    const [ing, al] = await Promise.all([getIngredients(), getLowStockAlerts()]);
-    setIngredients(ing);
-    setAlerts(al.filter(a => a.currentStock <= a.minStock));
+    try {
+      const [ing, al] = await Promise.all([getIngredients(), getLowStockAlerts()]);
+      const ingredientNames = new Map(ing.map(ingredient => [ingredient.id, ingredient.name]));
+      setIngredients(ing);
+      setAlerts(al
+        .filter(a => a.currentStock <= a.minStock)
+        .map(a => ({ ...a, ingredientId: ingredientNames.get(a.ingredientId) || a.ingredientId })));
+    } catch (err) {
+      console.error('Failed to load inventory overview', err);
+      setError('Could not load inventory overview. Check Firebase rules and configuration.');
+    } finally {
+      setLoading(false);
+    }
   };
+
+  if (loading) return <p className="text-center py-8">Loading inventory overview...</p>;
+  if (error) return <p className="text-center py-8 text-red-600">{error}</p>;
 
   return (
     <div className="space-y-6">
@@ -48,16 +63,18 @@ export function InventoryTab({ staff }: { staff: Staff }) {
         <CardHeader><CardTitle>Ingredient Overview</CardTitle><CardDescription>Current kitchen stock levels</CardDescription></CardHeader>
         <CardContent>
           <Table>
-            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Current Stock</TableHead><TableHead>Unit</TableHead><TableHead>Active</TableHead></TableRow></TableHeader>
+            <TableHeader><TableRow><TableHead>Name</TableHead><TableHead>Current Stock</TableHead><TableHead>Minimum Stock</TableHead><TableHead>Unit</TableHead><TableHead>Active</TableHead></TableRow></TableHeader>
             <TableBody>
               {ingredients.map(ing => (
                 <TableRow key={ing.id}>
                   <TableCell className="font-medium">{ing.name}</TableCell>
                   <TableCell>{ing.currentStock}</TableCell>
+                  <TableCell>{ing.minStock}</TableCell>
                   <TableCell>{ing.unit}</TableCell>
                   <TableCell>{ing.isActive ? 'Yes' : 'No'}</TableCell>
                 </TableRow>
               ))}
+              {ingredients.length === 0 && <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No ingredients recorded</TableCell></TableRow>}
             </TableBody>
           </Table>
         </CardContent>
