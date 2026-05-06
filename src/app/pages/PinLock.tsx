@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
@@ -8,17 +8,18 @@ import { Button } from '../components/ui/button';
 export function PinLock() {
   const [pin, setPin] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
   const { loginWithPin } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async () => {
-    if (pin.length !== 4) {
-      setError('Please enter a 4-digit PIN');
-      return;
-    }
+  const handleSubmit = async (currentPin: string) => {
+    if (currentPin.length !== 4) return;
+
+    setLoading(true);
+    setError('');
 
     try {
-      const staff = await loginWithPin(pin);
+      const staff = await loginWithPin(currentPin);
       if (staff) {
         switch (staff.role) {
           case 'admin':
@@ -36,23 +37,27 @@ export function PinLock() {
             break;
           default:
             setError('Invalid role');
+            setPin('');
         }
       } else {
-        setError('Invalid PIN');
+        setError('Invalid PIN. Try again.');
         setPin('');
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('Connection error. Please check Firebase configuration.');
+      setError('Connection error. Check Firebase configuration.');
       setPin('');
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && pin.length === 4) {
-      handleSubmit();
+  // Auto-submit when 4 digits are entered
+  useEffect(() => {
+    if (pin.length === 4) {
+      handleSubmit(pin);
     }
-  };
+  }, [pin]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#e07856] to-[#d4622e] p-4">
@@ -62,7 +67,7 @@ export function PinLock() {
           <CardDescription>Enter your 4-digit PIN to access the system</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex justify-center" onKeyDown={handleKeyDown}>
+          <div className="flex justify-center">
             <InputOTP
               maxLength={4}
               value={pin}
@@ -70,6 +75,7 @@ export function PinLock() {
                 setPin(value);
                 setError('');
               }}
+              disabled={loading}
             >
               <InputOTPGroup>
                 <InputOTPSlot index={0} />
@@ -79,6 +85,10 @@ export function PinLock() {
               </InputOTPGroup>
             </InputOTP>
           </div>
+
+          {loading && (
+            <p className="text-sm text-center text-gray-500">Signing in...</p>
+          )}
 
           {error && (
             <p className="text-sm text-red-500 text-center">{error}</p>
@@ -90,7 +100,7 @@ export function PinLock() {
                 key={idx}
                 variant={num === '' ? 'ghost' : 'outline'}
                 size="lg"
-                disabled={num === ''}
+                disabled={num === '' || loading}
                 onClick={() => {
                   if (num === '⌫') {
                     setPin(pin.slice(0, -1));
@@ -105,10 +115,6 @@ export function PinLock() {
               </Button>
             ))}
           </div>
-
-          <Button onClick={handleSubmit} disabled={pin.length !== 4} className="w-full" size="lg">
-            Enter
-          </Button>
         </CardContent>
       </Card>
     </div>
